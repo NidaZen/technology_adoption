@@ -1,0 +1,112 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+excel_file_path = f'D:/pythonProjects/US data 1845-2023.xlsx'
+datanew = pd.read_excel(excel_file_path)
+
+# Convert the 'date' column to datetime format
+datanew['Date Publish'] = pd.to_datetime(datanew['Date Publish'], errors='coerce')
+
+# Extract the year from the 'date' column
+datanew['year'] = datanew['Date Publish'].dt.year
+
+# Count the number of data entries for each year
+yearly_counts = datanew['year'].value_counts().sort_index()
+
+# Display the result
+print(yearly_counts)
+
+# Plotting
+plt.figure(figsize=(10, 6))
+plt.bar(yearly_counts.index, yearly_counts.values, color='blue')
+plt.xlabel('Year')
+plt.ylabel('Number of Data Entries')
+plt.title('Number of Data Entries According to Years')
+plt.show()
+
+# Calculate the cumulative sum
+cumulative_counts = yearly_counts.cumsum()
+
+# Plotting the S-curve
+plt.figure(figsize=(10, 6))
+plt.plot(cumulative_counts.index, cumulative_counts.values, marker='o', linestyle='-')
+plt.xlabel('Year')
+plt.ylabel('Cumulative Number of Data Entries')
+plt.title('S-Curve of Cumulative Data Entries Over Years')
+plt.grid(True)
+plt.show()
+print(cumulative_counts)
+
+# Assuming years start from 0
+years = cumulative_counts.index - cumulative_counts.index[0]
+
+# Logistic growth model
+def logistic_growth(t, K, P0, r):
+    return K / (1 + ((K - P0) / P0) * np.exp(-r * t))
+
+# Initial guesses for parameters (adjust as needed)
+initial_guesses = [100000, 1, 0.1]
+
+# Fit the logistic growth model to the data
+params, covariance = curve_fit(logistic_growth, years, cumulative_counts.values, p0=initial_guesses, maxfev=5000)
+
+# Extract parameters
+K, P0, r = params
+
+# Forecast until 2090
+future_years = np.arange(0, 2090 - cumulative_counts.index[0], 1)
+forecasted_patents = logistic_growth(future_years, K, P0, r)
+
+# Plotting the S-curve
+plt.figure(figsize=(10, 6))
+plt.scatter(cumulative_counts.index, cumulative_counts.values, label='Historical Data')
+plt.plot(future_years + cumulative_counts.index[0], forecasted_patents, label='Logistic Growth Model (Forecast)')
+plt.title('Cumulative Number of Patents (1845-2090)')
+plt.xlabel('Year')
+plt.ylabel('Cumulative Patents')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Print parameters and covariance matrix
+print("Parameters:", params)
+print("Covariance Matrix:", covariance)
+
+# Print forecasted patents with corresponding years
+print("\nForecasted Patents:")
+for year, patents in zip(future_years + cumulative_counts.index[0], forecasted_patents):
+    print(f"Year {int(year)}: {patents}")
+
+K, P0, r = params
+
+year_reaching_saturation = None
+for year, patents in zip(future_years, forecasted_patents):
+    if patents >= K * 0.99: # Check when the cumulative count is 99% of the saturation level
+        year_reaching_saturation = int(year + cumulative_counts.index[0])
+        break
+
+# Plotting the S-curve with the red line
+plt.figure(figsize=(10, 6))
+plt.scatter(cumulative_counts.index, cumulative_counts.values, label='Historical Data')
+plt.plot(future_years + cumulative_counts.index[0], forecasted_patents, label='Logistic Growth Model (Forecast)')
+plt.axhline(y=K, color='r', linestyle='--', label='Saturation Level (K)')
+
+# Check if year_reaching_saturation is not None before plotting the vertical line
+if year_reaching_saturation is not None:
+    plt.axvline(x=year_reaching_saturation, color='r', linestyle='--', label=f'Year of Saturation ({year_reaching_saturation})')
+
+plt.title('Cumulative Number of Patents (1845-2050)')
+plt.xlabel('Year')
+plt.ylabel('Cumulative Patents')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print("Parameters:", params)
+print("Year when forecasted patents reach saturation level (K):", year_reaching_saturation)
+print("Saturation Level:", K)
+
+
+
